@@ -1,0 +1,8 @@
+# EECS 498-007 / 598-005 solutions — CPU-only stack.
+# The shared csdiy venv already provides torch 2.12 (CPU); pin loosely here.
+torch>=2.0
+torchvision>=0.15
+numpy>=1.24
+matplotlib>=3.6
+seaborn>=0.12        # A5 Transformer attention heatmaps (imported by a5_helper)
+wget>=3.2            # A4 PASCAL VOC download helper

@@ -14,8 +14,12 @@ env/
 data/
 datasets/
 *.tar.gz
+*.tar
 cifar-10-batches-py/
 MNIST/
+mnist_data/
+mnist_dataset/
+voc_data/
 coco_captioning/
 
 # Model checkpoints produced by runs (large binaries)
