@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Datasets & caches (downloaded at runtime)
+data/
+datasets/
+*.tar.gz
+cifar-10-batches-py/
+MNIST/
+coco_captioning/
+
+# Model checkpoints produced by runs (large binaries)
+*.pt
+*.pth
+*.ckpt
+
+# Local starter staging
+_starter/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keep results committed, but ignore transient stuff
+results/**/*.tmp
