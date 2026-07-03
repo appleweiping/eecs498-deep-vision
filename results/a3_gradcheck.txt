@@ -1,0 +1,40 @@
+EECS 498-007 A3 numeric gradient checks
+========================================
+failed: []
+
+{
+  "Linear dx": 1.3186536330367085e-09,
+  "Linear dw": 1.769989286693649e-09,
+  "Linear db": 1.370580364002122e-09,
+  "ReLU dx": 2.6317794935718914e-10,
+  "TwoLayerNet(FC) W1": 1.0466708468956107e-06,
+  "TwoLayerNet(FC) W2": 7.65237131944988e-07,
+  "TwoLayerNet(FC) b1": 3.5472339873989003e-06,
+  "TwoLayerNet(FC) b2": 3.080707078072307e-09,
+  "FullyConnectedNet W1": 4.1787617007991455e-07,
+  "FullyConnectedNet W2": 6.40562939685786e-07,
+  "FullyConnectedNet W3": 4.868959688660344e-07,
+  "FullyConnectedNet b1": 1.0803602708997676e-05,
+  "FullyConnectedNet b2": 9.363121109738332e-08,
+  "FullyConnectedNet b3": 2.9568803298926488e-09,
+  "Dropout dx": 4.644810545452527e-09,
+  "adam converges to 0": 2.6802181174839472e-11,
+  "Conv dx": 1.284756714806153e-09,
+  "Conv dw": 1.848428439784431e-09,
+  "Conv db": 8.690278945589183e-10,
+  "Conv matches torch.conv2d": 1.2098819353382164e-16,
+  "MaxPool dx": 3.6534868512158766e-10,
+  "MaxPool matches torch": 0.0,
+  "BatchNorm dx": 1.505135181566256e-09,
+  "BatchNorm dgamma": 2.4885882557603834e-10,
+  "BatchNorm dbeta": 3.8165754878677595e-10,
+  "BatchNorm backward_alt==backward": 1.0605629803334491e-16,
+  "SpatialBatchNorm dx": 4.768697269828766e-09,
+  "ThreeLayerConvNet W1": 5.4667120345577084e-06,
+  "ThreeLayerConvNet W2": 3.665567200389098e-06,
+  "ThreeLayerConvNet W3": 2.9885815452786903e-06,
+  "ThreeLayerConvNet b1": 8.858762251163946e-05,
+  "ThreeLayerConvNet b2": 1.3884214898904362e-06,
+  "ThreeLayerConvNet b3": 2.892782574144463e-09,
+  "DeepConvNet(bn) max grad err": 9.430214990191927e-09
+}

@@ -1,0 +1,17 @@
+EECS 498-007 A2 numeric gradient checks
+========================================
+failed: []
+
+{
+  "SVM loss naive==vectorized": 8.881784197001252e-16,
+  "SVM dW naive==vectorized": 4.0743529960396064e-16,
+  "SVM dW numeric": 3.075487124595833e-09,
+  "Softmax loss naive==vectorized": 2.220446049250313e-16,
+  "Softmax dW naive==vectorized": 1.9804778702086722e-16,
+  "Softmax dW numeric": 4.502494384097965e-09,
+  "Softmax init loss ~ log(C)": 0.0019073242167915172,
+  "TwoLayerNet(A2) W1": 1.8259374409864213e-08,
+  "TwoLayerNet(A2) W2": 8.393995566729642e-09,
+  "TwoLayerNet(A2) b1": 3.8737215646456026e-08,
+  "TwoLayerNet(A2) b2": 2.190920588638383e-09
+}

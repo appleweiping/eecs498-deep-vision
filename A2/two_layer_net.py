@@ -146,8 +146,9 @@ def nn_forward_pass(params: Dict[str, torch.Tensor], X: torch.Tensor):
     # Store the result in the scores variable, which should be an tensor of    #
     # shape (N, C).                                                            #
     ############################################################################
-    # Replace "pass" statement with your code
-    pass
+    z1 = X.mm(W1) + b1                     # (N, H)
+    hidden = z1.clamp_min(0.0)             # ReLU (no torch.relu allowed here)
+    scores = hidden.mm(W2) + b2            # (N, C)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -211,8 +212,13 @@ def nn_forward_backward(
     # If you are not careful here, it is easy to run into numeric instability  #
     # (Check Numeric Stability in http://cs231n.github.io/linear-classify/).   #
     ############################################################################
-    # Replace "pass" statement with your code
-    pass
+    # Numerically-stable softmax cross-entropy.
+    shifted = scores - scores.max(dim=1, keepdim=True).values
+    exp_scores = shifted.exp()
+    probs = exp_scores / exp_scores.sum(dim=1, keepdim=True)   # (N, C)
+    correct_logprobs = -torch.log(probs[torch.arange(N), y] + 1e-12)
+    loss = correct_logprobs.sum() / N
+    loss += reg * (torch.sum(W1 * W1) + torch.sum(W2 * W2))
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -225,8 +231,17 @@ def nn_forward_backward(
     # For example, grads['W1'] should store the gradient on W1, and be a      #
     # tensor of same size                                                     #
     ###########################################################################
-    # Replace "pass" statement with your code
-    pass
+    dscores = probs.clone()
+    dscores[torch.arange(N), y] -= 1.0
+    dscores /= N                                # (N, C)
+
+    grads["W2"] = h1.t().mm(dscores) + 2.0 * reg * W2
+    grads["b2"] = dscores.sum(dim=0)
+
+    dh1 = dscores.mm(W2.t())                     # (N, H)
+    dh1[h1 <= 0] = 0.0                           # ReLU backprop
+    grads["W1"] = X.t().mm(dh1) + 2.0 * reg * W1
+    grads["b1"] = dh1.sum(dim=0)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -306,8 +321,8 @@ def nn_train(
         # using stochastic gradient descent. You'll need to use the gradients   #
         # stored in the grads dictionary defined above.                         #
         #########################################################################
-        # Replace "pass" statement with your code
-        pass
+        for name in params:
+            params[name] -= learning_rate * grads[name]
         #########################################################################
         #                             END OF YOUR CODE                          #
         #########################################################################
@@ -364,8 +379,8 @@ def nn_predict(
     ###########################################################################
     # TODO: Implement this function; it should be VERY simple!                #
     ###########################################################################
-    # Replace "pass" statement with your code
-    pass
+    scores = loss_func(params, X)
+    y_pred = scores.argmax(dim=1)
     ###########################################################################
     #                              END OF YOUR CODE                           #
     ###########################################################################
@@ -398,8 +413,10 @@ def nn_get_search_params():
     # different hyperparameters to achieve good performance with the softmax  #
     # classifier.                                                             #
     ###########################################################################
-    # Replace "pass" statement with your code
-    pass
+    learning_rates = [0.5, 1.0]
+    hidden_sizes = [128, 256]
+    regularization_strengths = [1e-4, 1e-3]
+    learning_rate_decays = [0.95]
     ###########################################################################
     #                           END OF YOUR CODE                              #
     ###########################################################################
@@ -459,8 +476,35 @@ def find_best_net(
     # to write code to sweep through possible combinations of hyperparameters   #
     # automatically like we did on the previous exercises.                      #
     #############################################################################
-    # Replace "pass" statement with your code
-    pass
+    lrs, hidden_sizes, regs, lr_decays = get_param_set_fn()
+    X_train = data_dict["X_train"]
+    y_train = data_dict["y_train"]
+    X_val = data_dict["X_val"]
+    y_val = data_dict["y_val"]
+    input_size = X_train.shape[1]
+    num_classes = int(y_train.max().item()) + 1
+    device = X_train.device
+    dtype = X_train.dtype
+
+    for hs in hidden_sizes:
+        for lr in lrs:
+            for reg in regs:
+                for lrd in lr_decays:
+                    net = TwoLayerNet(
+                        input_size, hs, num_classes,
+                        dtype=dtype, device=device,
+                    )
+                    stat = net.train(
+                        X_train, y_train, X_val, y_val,
+                        learning_rate=lr, learning_rate_decay=lrd,
+                        reg=reg, num_iters=3000, batch_size=1000,
+                        verbose=False,
+                    )
+                    val_acc = stat["val_acc_history"][-1]
+                    if val_acc > best_val_acc:
+                        best_val_acc = val_acc
+                        best_net = net
+                        best_stat = stat
     #############################################################################
     #                               END OF YOUR CODE                            #
     #############################################################################
