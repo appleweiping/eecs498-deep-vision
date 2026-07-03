@@ -1,0 +1,9 @@
+EECS 498-007 A6 (VAE / GAN) verification
+========================================
+failed checks: []
+
+{
+  "vae_final_negELBO_per_img": 158.13,
+  "gan_final_D_loss": 1.161,
+  "gan_final_G_loss": 1.014
+}

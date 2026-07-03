@@ -111,8 +111,9 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     # hidden state and any values you need for the backward pass in the next_h
     # and cache variables respectively.
     ##########################################################################
-    # Replace "pass" statement with your code
-    pass
+    z = x.mm(Wx) + prev_h.mm(Wh) + b
+    next_h = torch.tanh(z)
+    cache = (x, prev_h, Wx, Wh, next_h)
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -141,8 +142,14 @@ def rnn_step_backward(dnext_h, cache):
     # HINT: For the tanh function, you can compute the local derivative in
     # terms of the output value from tanh.
     ##########################################################################
-    # Replace "pass" statement with your code
-    pass
+    x, prev_h, Wx, Wh, next_h = cache
+    # d/dz tanh(z) = 1 - tanh(z)^2 = 1 - next_h^2
+    dz = dnext_h * (1 - next_h ** 2)                 # (N, H)
+    dx = dz.mm(Wx.t())
+    dprev_h = dz.mm(Wh.t())
+    dWx = x.t().mm(dz)
+    dWh = prev_h.t().mm(dz)
+    db = dz.sum(dim=0)
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -173,8 +180,15 @@ def rnn_forward(x, h0, Wx, Wh, b):
     # input data. You should use the rnn_step_forward function that you defined
     # above. You can use a for loop to help compute the forward pass.
     ##########################################################################
-    # Replace "pass" statement with your code
-    pass
+    N, T, D = x.shape
+    H = h0.shape[1]
+    h = x.new_zeros(N, T, H)
+    cache = []
+    prev_h = h0
+    for t in range(T):
+        prev_h, step_cache = rnn_step_forward(x[:, t, :], prev_h, Wx, Wh, b)
+        h[:, t, :] = prev_h
+        cache.append(step_cache)
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -206,8 +220,23 @@ def rnn_backward(dh, cache):
     # sequence of data. You should use the rnn_step_backward function that you
     # defined above. You can use a for loop to help compute the backward pass.
     ##########################################################################
-    # Replace "pass" statement with your code
-    pass
+    N, T, H = dh.shape
+    x0, prev_h0, Wx, Wh, _ = cache[0]
+    D = x0.shape[1]
+    dx = dh.new_zeros(N, T, D)
+    dWx = torch.zeros_like(Wx)
+    dWh = torch.zeros_like(Wh)
+    db = dh.new_zeros(H)
+    dprev_h = dh.new_zeros(N, H)
+    for t in reversed(range(T)):
+        # Upstream grad = this timestep's loss grad + grad from next timestep.
+        dnext_h = dh[:, t, :] + dprev_h
+        dx_t, dprev_h, dWx_t, dWh_t, db_t = rnn_step_backward(dnext_h, cache[t])
+        dx[:, t, :] = dx_t
+        dWx += dWx_t
+        dWh += dWh_t
+        db += db_t
+    dh0 = dprev_h
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -299,8 +328,7 @@ class WordEmbedding(nn.Module):
         ######################################################################
         # TODO: Implement the forward pass for word embeddings.
         ######################################################################
-        # Replace "pass" statement with your code
-        pass
+        out = self.W_embed[x]                            # (N, T, D)
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -344,8 +372,7 @@ def temporal_softmax_loss(x, y, ignore_index=None):
     # We use a cross-entropy loss at each timestep, *summing* the loss over
     # all timesteps and *averaging* across the minibatch.
     ##########################################################################
-    # Replace "pass" statement with your code
-    pass
+    loss = F.cross_entropy(x.reshape(-1, x.shape[2]), y.reshape(-1), ignore_index=ignore_index, reduction='sum') / x.shape[0]
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -415,8 +442,29 @@ class CaptioningRNN(nn.Module):
         # (1) output projection (from RNN hidden state to vocab probability)
         # (2) feature projection (from CNN pooled feature to h0)
         ######################################################################
-        # Replace "pass" statement with your code
-        pass
+        self.image_encoder = ImageEncoder(
+            pretrained=image_encoder_pretrained, verbose=False)
+        enc_channels = self.image_encoder.out_channels
+
+        self.word_embed = WordEmbedding(vocab_size, wordvec_dim)
+
+        # Feature projection: CNN feature -> initial hidden state / attention A.
+        # For attn we project each 4x4 spatial location (1x1 conv), otherwise we
+        # project the pooled feature vector.
+        if cell_type == "attn":
+            self.feature_proj = nn.Conv2d(enc_channels, hidden_dim, kernel_size=1)
+        else:
+            self.feature_proj = nn.Linear(enc_channels, hidden_dim)
+
+        if cell_type == "rnn":
+            self.rnn = RNN(wordvec_dim, hidden_dim)
+        elif cell_type == "lstm":
+            self.rnn = LSTM(wordvec_dim, hidden_dim)
+        elif cell_type == "attn":
+            self.rnn = AttentionLSTM(wordvec_dim, hidden_dim)
+
+        # Output projection: hidden state -> vocabulary scores.
+        self.output_proj = nn.Linear(hidden_dim, vocab_size)
         ######################################################################
         #                            END OF YOUR CODE                        #
         ######################################################################
@@ -466,8 +514,29 @@ class CaptioningRNN(nn.Module):
         #
         # Do not worry about regularizing the weights or their gradients!
         ######################################################################
-        # Replace "pass" statement with your code
-        pass
+        # (1) Encode images -> spatial features -> project.
+        features = self.image_encoder(images)            # (N, C, 4, 4)
+        if self.cell_type == "attn":
+            A = self.feature_proj(features)              # (N, H, 4, 4)
+        else:
+            pooled = features.mean(dim=(2, 3))           # (N, C)
+            h0 = self.feature_proj(pooled)               # (N, H)
+
+        # (2) Embed input words.
+        word_vecs = self.word_embed(captions_in)         # (N, T, W)
+
+        # (3) Run the recurrent network.
+        if self.cell_type == "attn":
+            hidden = self.rnn(word_vecs, A)              # (N, T, H)
+        else:
+            hidden = self.rnn(word_vecs, h0)             # (N, T, H)
+
+        # (4) Vocabulary scores.
+        scores = self.output_proj(hidden)               # (N, T, V)
+
+        # (5) Temporal softmax loss, ignoring <NULL> targets.
+        loss = temporal_softmax_loss(
+            scores, captions_out, ignore_index=self.ignore_index)
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -528,8 +597,33 @@ class CaptioningRNN(nn.Module):
         # to $A$ of shape Hx4x4. The LSTM initial hidden state and cell state
         # would both be A.mean(dim=(2, 3)).
         #######################################################################
-        # Replace "pass" statement with your code
-        pass
+        features = self.image_encoder(images)            # (N, C, 4, 4)
+        if self.cell_type == "attn":
+            A = self.feature_proj(features)              # (N, H, 4, 4)
+            prev_h = A.mean(dim=(2, 3))                  # (N, H)
+            prev_c = A.mean(dim=(2, 3))
+        else:
+            pooled = features.mean(dim=(2, 3))
+            prev_h = self.feature_proj(pooled)           # (N, H)
+            if self.cell_type == "lstm":
+                prev_c = torch.zeros_like(prev_h)
+
+        # First word fed to the RNN is <START>.
+        words = self._start * images.new(N).fill_(1).long()
+        for t in range(max_length):
+            word_vecs = self.word_embed(words)           # (N, W)
+            if self.cell_type == "rnn":
+                prev_h = self.rnn.step_forward(word_vecs, prev_h)
+            elif self.cell_type == "lstm":
+                prev_h, prev_c = self.rnn.step_forward(word_vecs, prev_h, prev_c)
+            elif self.cell_type == "attn":
+                attn, attn_weights = dot_product_attention(prev_h, A)
+                attn_weights_all[:, t] = attn_weights
+                prev_h, prev_c = self.rnn.step_forward(
+                    word_vecs, prev_h, prev_c, attn)
+            scores = self.output_proj(prev_h)            # (N, V)
+            words = scores.argmax(dim=1)                 # (N,)
+            captions[:, t] = words
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -589,8 +683,14 @@ class LSTM(nn.Module):
         # TODO: Implement the forward pass for a single timestep of an LSTM.
         ######################################################################
         next_h, next_c = None, None
-        # Replace "pass" statement with your code
-        pass
+        H = prev_h.shape[1]
+        a = x.mm(self.Wx) + prev_h.mm(self.Wh) + self.b     # (N, 4H)
+        i = torch.sigmoid(a[:, 0:H])
+        f = torch.sigmoid(a[:, H:2 * H])
+        o = torch.sigmoid(a[:, 2 * H:3 * H])
+        g = torch.tanh(a[:, 3 * H:4 * H])
+        next_c = f * prev_c + i * g
+        next_h = o * torch.tanh(next_c)
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -622,9 +722,13 @@ class LSTM(nn.Module):
         ######################################################################
         # TODO: Implement the forward pass for an LSTM over entire timeseries
         ######################################################################
-        hn = None
-        # Replace "pass" statement with your code
-        pass
+        N, T, D = x.shape
+        H = h0.shape[1]
+        hn = x.new_zeros(N, T, H)
+        prev_h, prev_c = h0, c0
+        for t in range(T):
+            prev_h, prev_c = self.step_forward(x[:, t, :], prev_h, prev_c)
+            hn[:, t, :] = prev_h
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -654,8 +758,13 @@ def dot_product_attention(prev_h, A):
     # You will use this function for `AttentionLSTM` forward and sample      #
     # functions. HINT: Make sure you reshape attn_weights back to (N, 4, 4)! #
     ##########################################################################
-    # Replace "pass" statement with your code
-    pass
+    A_flat = A.reshape(N, H, D_a * D_a)                  # (N, H, 16)
+    # Scaled dot product between prev_h (N, H) and each spatial location.
+    scores = torch.bmm(prev_h.unsqueeze(1), A_flat).squeeze(1)  # (N, 16)
+    scores = scores / math.sqrt(H)
+    attn_weights = F.softmax(scores, dim=1)              # (N, 16)
+    attn = torch.bmm(A_flat, attn_weights.unsqueeze(2)).squeeze(2)  # (N, H)
+    attn_weights = attn_weights.reshape(N, D_a, D_a)     # (N, 4, 4)
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -718,8 +827,15 @@ class AttentionLSTM(nn.Module):
         # Feel free to re-use some of your code from `LSTM.step_forward()`.
         #######################################################################
         next_h, next_c = None, None
-        # Replace "pass" statement with your code
-        pass
+        H = prev_h.shape[1]
+        a = (x.mm(self.Wx) + prev_h.mm(self.Wh)
+             + attn.mm(self.Wattn) + self.b)               # (N, 4H)
+        i = torch.sigmoid(a[:, 0:H])
+        f = torch.sigmoid(a[:, H:2 * H])
+        o = torch.sigmoid(a[:, 2 * H:3 * H])
+        g = torch.tanh(a[:, 3 * H:4 * H])
+        next_c = f * prev_c + i * g
+        next_h = o * torch.tanh(next_c)
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -760,9 +876,15 @@ class AttentionLSTM(nn.Module):
         # series. You should use the `dot_product_attention` function that   #
         # is defined outside this module.                                    #
         ######################################################################
-        hn = None
-        # Replace "pass" statement with your code
-        pass
+        N, T, D = x.shape
+        H = h0.shape[1]
+        hn = x.new_zeros(N, T, H)
+        prev_h, prev_c = h0, c0
+        for t in range(T):
+            attn, _ = dot_product_attention(prev_h, A)
+            prev_h, prev_c = self.step_forward(
+                x[:, t, :], prev_h, prev_c, attn)
+            hn[:, t, :] = prev_h
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
