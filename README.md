@@ -32,7 +32,7 @@ measured numbers below are reproduced by the scripts in each folder.
 | **A1** kNN | k-Nearest-Neighbor CIFAR-10 classifier + all PyTorch-101 tensor ops | 28/28 correctness checks pass; kNN on CIFAR-10 (see `results/a1_knn.txt`) |
 | **A2** Linear | SVM & Softmax (naive + vectorized), two-layer net | 11/11 numeric grad-checks pass, all rel-err &lt; 1e-5; naive == vectorized to 1e-15 |
 | **A3** FC & Conv | modular FC net (dropout, SGD/momentum/RMSProp/Adam), conv net (Conv/MaxPool, BatchNorm, DeepConvNet, Kaiming) | 35/35 numeric grad-checks pass, max rel-err ≈ 9e-5; Conv/MaxPool match `torch` to 1e-16 |
-| **A4** Detection | FCOS one-stage + Faster R-CNN two-stage (FPN, from-scratch NMS/IoU, anchors, RoI-align) | 12/12 geometry checks pass; NMS matches torchvision; both detectors train + infer end-to-end |
+| **A4** Detection | FCOS one-stage + Faster R-CNN two-stage (FPN, from-scratch NMS/IoU, anchors, RoI-align) | 12/12 geometry checks pass; NMS matches torchvision; both detectors train + infer end-to-end; **FCOS loss on real VOC 3.78 → 2.98** (150 iters) |
 | **A5** RNN + Transformer | vanilla RNN / LSTM / attention captioning, full Transformer | RNN grad-checks pass; **Transformer 58.4% val token-acc** on the add/subtract task |
 | **A6** Generative | VAE / CVAE, vanilla & DC GAN, saliency / adversarial, style transfer | **VAE neg-ELBO/img = 158.1** (digit-like samples), vanilla GAN converged |
 
@@ -125,14 +125,17 @@ Correctness is established two ways:
    (forward + backward + NMS-based inference) and its NMS matches
    `torchvision.ops.nms` exactly.
 
-### A5 object detection — documented partial
+### A4 object detection — reduced-real on CPU
 
-FCOS/Faster R-CNN on PASCAL VOC 2007 is compute-heavy and the dataset is a
-~450 MB download. All detection code is fully implemented and verified (geometry
-checks, and complete forward/backward/inference of both detectors on real-sized
-inputs — see `results/a4_detection.txt`). The end-to-end multi-epoch VOC training
-to a competitive mAP requires a GPU; on this CPU-only machine it is run as a
-**reduced-real** loop and documented as such rather than trained to convergence.
+FCOS/Faster R-CNN on PASCAL VOC 2007 is compute-heavy. All detection code is
+fully implemented and verified: 12/12 geometry checks, NMS matching
+`torchvision`, and complete forward/backward/inference of **both** detectors on
+real-sized inputs. A **reduced-real** FCOS training loop on real VOC 2007 images
+(150 iterations, SGD + momentum) shows a genuine downward loss trend — the
+20-iteration windowed average drops from **3.78 → 2.98** (see
+`results/a4_detection.txt`). Training to a competitive mAP needs a GPU and
+thousands of iterations, so full convergence is documented as out of scope for
+this CPU-only build rather than claimed.
 
 ## Tech stack
 

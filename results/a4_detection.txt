@@ -1,0 +1,11 @@
+EECS 498-007 A4 (object detection) verification
+========================================
+failed checks: []
+VOC reduced-real training completed: True
+
+{
+  "fcos_synth_total_loss": 3.3624,
+  "frcnn_synth_total_loss": 3.4885,
+  "voc_fcos_first20_avg_loss": 3.777,
+  "voc_fcos_last20_avg_loss": 2.9838
+}

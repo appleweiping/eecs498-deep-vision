@@ -167,28 +167,36 @@ try:
     # __getitem__ returns (image_path, image, gt_boxes); default collate works.
     loader = DataLoader(train_ds, batch_size=8, shuffle=True, num_workers=0)
     model = osd.FCOS(num_classes=20, fpn_channels=64, stem_channels=[64, 64])
-    optim = torch.optim.SGD(model.parameters(), lr=1e-3, momentum=0.9)
+
+    # Reduced-real run using the course's own SGD+step-decay trainer. VOC to a
+    # competitive mAP needs a GPU + thousands of iters; here we run ~150 iters
+    # to demonstrate a genuine downward loss trend on real VOC images.
+    from a4_helper import infinite_loader
+    import torch.optim as toptim
+    model.to("cpu")
+    opt = toptim.SGD(filter(lambda p: p.requires_grad, model.parameters()),
+                     lr=8e-3, momentum=0.9, weight_decay=1e-4)
+    inf = infinite_loader(loader)
     model.train()
     losses_seen = []
-    it = iter(loader)
-    for step in range(30):  # reduced-real: 30 iterations
-        try:
-            _, imgs, gtb = next(it)
-        except StopIteration:
-            it = iter(loader)
-            _, imgs, gtb = next(it)
+    max_iters = 150
+    for step in range(max_iters):
+        _, imgs, gtb = next(inf)
         out = model(imgs, gtb)
         loss = out["loss_cls"] + out["loss_box"] + out["loss_ctr"]
-        optim.zero_grad()
+        opt.zero_grad()
         loss.backward()
-        optim.step()
+        opt.step()
         losses_seen.append(loss.item())
-        if step % 10 == 0:
-            print(f"  VOC step {step}: loss={loss.item():.4f}")
-    RESULTS["voc_fcos_first_loss"] = round(losses_seen[0], 4)
-    RESULTS["voc_fcos_last_loss"] = round(sum(losses_seen[-5:]) / 5, 4)
-    check("VOC FCOS loss decreased",
-          RESULTS["voc_fcos_last_loss"] < RESULTS["voc_fcos_first_loss"])
+        if step % 25 == 0:
+            print(f"  VOC iter {step}: loss={loss.item():.4f}")
+    # Compare windowed averages (robust to per-batch SGD noise).
+    first_avg = sum(losses_seen[:20]) / 20
+    last_avg = sum(losses_seen[-20:]) / 20
+    RESULTS["voc_fcos_first20_avg_loss"] = round(first_avg, 4)
+    RESULTS["voc_fcos_last20_avg_loss"] = round(last_avg, 4)
+    print(f"  VOC FCOS loss: first-20 avg={first_avg:.4f} -> last-20 avg={last_avg:.4f}")
+    check("VOC FCOS loss decreased", last_avg < first_avg)
     voc_done = True
 except Exception as e:
     print(f"  VOC training skipped/partial: {type(e).__name__}: {str(e)[:200]}")
