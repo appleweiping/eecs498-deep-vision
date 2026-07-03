@@ -1,0 +1,8 @@
+EECS 498-007 A5 (RNN + Transformer) verification
+========================================
+failed checks: []
+
+{
+  "transformer_val_loss": 0.984,
+  "transformer_val_token_acc": 0.5843
+}
