@@ -1,0 +1,9 @@
+EECS 498-007 A3 real CIFAR-10 DeepConvNet training
+========================================
+{
+  "deepconvnet_cifar_train_acc_1k": 0.607,
+  "deepconvnet_cifar_val_acc": 0.606,
+  "best_val_acc_during_training": 0.606,
+  "train_seconds": 101.7,
+  "final_train_loss": 0.9788
+}

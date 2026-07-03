@@ -29,9 +29,9 @@ measured numbers below are reproduced by the scripts in each folder.
 
 | Assignment | What it does | Result (measured) |
 |---|---|---|
-| **A1** kNN | k-Nearest-Neighbor CIFAR-10 classifier + all PyTorch-101 tensor ops | 28/28 correctness checks pass; kNN on CIFAR-10 (see `results/a1_knn.txt`) |
+| **A1** kNN | k-Nearest-Neighbor CIFAR-10 classifier + all PyTorch-101 tensor ops | 28/28 correctness checks pass; **kNN 27.8% test acc** on CIFAR-10, 5-fold CV picks k=12 |
 | **A2** Linear | SVM & Softmax (naive + vectorized), two-layer net | 11/11 numeric grad-checks pass, all rel-err &lt; 1e-5; naive == vectorized to 1e-15 |
-| **A3** FC & Conv | modular FC net (dropout, SGD/momentum/RMSProp/Adam), conv net (Conv/MaxPool, BatchNorm, DeepConvNet, Kaiming) | 35/35 numeric grad-checks pass, max rel-err ≈ 9e-5; Conv/MaxPool match `torch` to 1e-16 |
+| **A3** FC & Conv | modular FC net (dropout, SGD/momentum/RMSProp/Adam), conv net (Conv/MaxPool, BatchNorm, DeepConvNet, Kaiming) | 35/35 numeric grad-checks pass, max rel-err ≈ 9e-5; Conv/MaxPool match `torch` to 1e-16; **DeepConvNet 60.6% CIFAR-10 val acc** (5 epochs, 102 s CPU) |
 | **A4** Detection | FCOS one-stage + Faster R-CNN two-stage (FPN, from-scratch NMS/IoU, anchors, RoI-align) | 12/12 geometry checks pass; NMS matches torchvision; both detectors train + infer end-to-end; **FCOS loss on real VOC 3.78 → 2.98** (150 iters) |
 | **A5** RNN + Transformer | vanilla RNN / LSTM / attention captioning, full Transformer | RNN grad-checks pass; **Transformer 58.4% val token-acc** on the add/subtract task |
 | **A6** Generative | VAE / CVAE, vanilla & DC GAN, saliency / adversarial, style transfer | **VAE neg-ELBO/img = 158.1** (digit-like samples), vanilla GAN converged |
@@ -117,12 +117,14 @@ Correctness is established two ways:
    with relative error below `1e-5`; `Conv`/`MaxPool` forward passes match
    `torch.nn.functional` to machine precision. See `results/a2_gradcheck.txt` and
    `results/a3_gradcheck.txt`.
-2. **Real train / inference runs.** A6 trains a VAE and a GAN on MNIST (reaching a
-   negative-ELBO of ≈ 158 per image, with recognizable digit samples in
-   `results/a6_vae_samples.png`); A5 trains the Transformer to 58.4% validation
-   token accuracy on the two-digit arithmetic task
-   (`results/a5_transformer.txt`); A4 runs both detectors end-to-end
-   (forward + backward + NMS-based inference) and its NMS matches
+2. **Real train / inference runs.** A1 runs kNN on CIFAR-10 (27.8% test accuracy,
+   with 5-fold cross-validation) and A3 trains a `DeepConvNet` to **60.6%
+   validation accuracy** on CIFAR-10 in 102 s on CPU (`results/a3_cifar.txt`);
+   A6 trains a VAE and a GAN on MNIST (reaching a negative-ELBO of ≈ 158 per
+   image, with recognizable digit samples in `results/a6_vae_samples.png`); A5
+   trains the Transformer to 58.4% validation token accuracy on the two-digit
+   arithmetic task (`results/a5_transformer.txt`); A4 runs both detectors
+   end-to-end (forward + backward + NMS-based inference) and its NMS matches
    `torchvision.ops.nms` exactly.
 
 ### A4 object detection — reduced-real on CPU
