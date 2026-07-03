@@ -989,8 +989,8 @@ class FasterRCNN(nn.Module):
         gt_classes = matched_gt_boxes[sampled, 4].long() + 1     # bg(-1)->0
         sampled_logits = pred_cls_logits[sampled]                # (S, C+1)
 
-        # 3. Cross-entropy loss.
-        loss_cls = F.cross_entropy(sampled_logits, gt_classes, reduction="none")
+        # 3. Cross-entropy loss (mean over sampled proposals -> scalar).
+        loss_cls = F.cross_entropy(sampled_logits, gt_classes, reduction="mean")
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
