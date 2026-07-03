@@ -83,8 +83,15 @@ class DetectorBackboneWithFPN(nn.Module):
         # Add THREE lateral 1x1 conv and THREE output 3x3 conv layers.
         self.fpn_params = nn.ModuleDict()
 
-        # Replace "pass" statement with your code
-        pass
+        # dummy_out_shapes is [("c3", shape), ("c4", shape), ("c5", shape)].
+        for level_name, feat_shape in dummy_out_shapes:
+            in_ch = feat_shape[1]
+            # Lateral 1x1 conv projects each level to `out_channels`.
+            self.fpn_params[f"lateral_{level_name}"] = nn.Conv2d(
+                in_ch, out_channels, kernel_size=1, stride=1, padding=0)
+            # Output 3x3 conv (stride 1, pad 1 preserves spatial size).
+            self.fpn_params[f"output_{level_name}"] = nn.Conv2d(
+                out_channels, out_channels, kernel_size=3, stride=1, padding=1)
         ######################################################################
         #                            END OF YOUR CODE                        #
         ######################################################################
@@ -109,9 +116,19 @@ class DetectorBackboneWithFPN(nn.Module):
         # (c3, c4, c5) and FPN conv layers created above.                    #
         # HINT: Use `F.interpolate` to upsample FPN features.                #
         ######################################################################
-
-        # Replace "pass" statement with your code
-        pass
+        c3, c4, c5 = backbone_feats["c3"], backbone_feats["c4"], backbone_feats["c5"]
+        # Lateral projections.
+        l3 = self.fpn_params["lateral_c3"](c3)
+        l4 = self.fpn_params["lateral_c4"](c4)
+        l5 = self.fpn_params["lateral_c5"](c5)
+        # Top-down merge: upsample coarser level and add.
+        m5 = l5
+        m4 = l4 + F.interpolate(m5, size=l4.shape[-2:], mode="nearest")
+        m3 = l3 + F.interpolate(m4, size=l3.shape[-2:], mode="nearest")
+        # Output 3x3 convs.
+        fpn_feats["p3"] = self.fpn_params["output_c3"](m3)
+        fpn_feats["p4"] = self.fpn_params["output_c4"](m4)
+        fpn_feats["p5"] = self.fpn_params["output_c5"](m5)
         ######################################################################
         #                            END OF YOUR CODE                        #
         ######################################################################
@@ -156,8 +173,15 @@ def get_fpn_location_coords(
         ######################################################################
         # TODO: Implement logic to get location co-ordinates below.          #
         ######################################################################
-        # Replace "pass" statement with your code
-        pass
+        _, _, H, W = feat_shape
+        ys = torch.arange(H, dtype=dtype, device=device)
+        xs = torch.arange(W, dtype=dtype, device=device)
+        # Center of each receptive field on the input image.
+        yc = (ys + 0.5) * level_stride
+        xc = (xs + 0.5) * level_stride
+        grid_y, grid_x = torch.meshgrid(yc, xc, indexing="ij")   # (H, W)
+        coords = torch.stack([grid_x.reshape(-1), grid_y.reshape(-1)], dim=1)
+        location_coords[level_name] = coords                     # (H*W, 2)
         ######################################################################
         #                             END OF YOUR CODE                       #
         ######################################################################
@@ -195,8 +219,28 @@ def nms(boxes: torch.Tensor, scores: torch.Tensor, iou_threshold: float = 0.5):
     # HINT: You can refer to the torchvision library code:                      #
     # github.com/pytorch/vision/blob/main/torchvision/csrc/ops/cpu/nms_kernel.cpp
     #############################################################################
-    # Replace "pass" statement with your code
-    pass
+    x1, y1, x2, y2 = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
+    areas = (x2 - x1).clamp(min=0) * (y2 - y1).clamp(min=0)
+    order = scores.argsort(descending=True)
+    keep_list = []
+    while order.numel() > 0:
+        i = order[0].item()
+        keep_list.append(i)
+        if order.numel() == 1:
+            break
+        rest = order[1:]
+        # Intersection of box i with all remaining boxes.
+        xx1 = torch.maximum(x1[i], x1[rest])
+        yy1 = torch.maximum(y1[i], y1[rest])
+        xx2 = torch.minimum(x2[i], x2[rest])
+        yy2 = torch.minimum(y2[i], y2[rest])
+        w = (xx2 - xx1).clamp(min=0)
+        h = (yy2 - yy1).clamp(min=0)
+        inter = w * h
+        iou = inter / (areas[i] + areas[rest] - inter)
+        # Keep only boxes with IoU <= threshold.
+        order = rest[iou <= iou_threshold]
+    keep = torch.tensor(keep_list, dtype=torch.long, device=boxes.device)
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
