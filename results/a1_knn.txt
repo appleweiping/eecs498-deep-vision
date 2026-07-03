@@ -1,0 +1,18 @@
+EECS 498-007 A1 verification
+========================================
+correctness checks failed: []
+
+{
+  "knn_k1_test_acc": 27.4,
+  "knn_k5_test_acc": 27.8,
+  "cv_mean_acc_by_k": {
+    "1": 26.56,
+    "3": 24.96,
+    "5": 27.32,
+    "8": 27.6,
+    "12": 27.94,
+    "20": 27.9
+  },
+  "best_k": 12,
+  "knn_best_k12_test_acc": 25.6
+}
